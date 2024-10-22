@@ -34,6 +34,7 @@ class IncidentCheck {
     };
   }
 
+  // Fetches all rail/bus current incidents from WMATA API
   async fetchAllIncidents(): Promise<IncidentTypes> {
     try {
       const [rail, bus] = await Promise.all([
@@ -58,10 +59,12 @@ class IncidentCheck {
     }
   }
 
+  // Uses check interval to filter all incidents down to new within interval
   getNewIncidents(): IncidentTypes {
     const now = new Date();
     const estNow = toZonedTime(now, "America/New_York");
     const cutoffTime = subMinutes(estNow, IncidentCheck.CHECK_INTERVAL_MINUTES);
+    console.log("Calculated cutoff time: ", cutoffTime);
 
     return {
       rail: this._filterIncidents(this.incidents.rail, cutoffTime),
@@ -69,51 +72,43 @@ class IncidentCheck {
     };
   }
 
-  formatIncidentMessage(incident: any, type: "rail" | "bus"): string {
-    let message = "";
-
-    switch (type) {
-      case "rail":
-        message = `🚇 Rail Alert: ${incident.Description}${
-          incident.LinesAffected
-            ? `\nLines affected: ${incident.LinesAffected}`
-            : ""
-        }`;
-        break;
-      case "bus":
-        message = `🚌 Bus Alert: ${incident.Description}${
-          incident.RoutesAffected?.length
-            ? `\nRoutes affected: ${incident.RoutesAffected.join(", ")}`
-            : ""
-        }`;
-        break;
-    }
-
-    return message.length <= IncidentCheck.MAX_MESSAGE_LENGTH
-      ? message
-      : `${message.slice(0, IncidentCheck.MAX_MESSAGE_LENGTH - 3)}...`;
-  }
-
+  // Creates a formatted post message for each new incident
   getFormattedIncidents(incidents: IncidentTypes): FormattedIncident[] {
     const formattedIncidents: FormattedIncident[] = [];
 
-    // Process rail incidents
     incidents.rail.forEach((incident) => {
       formattedIncidents.push({
         type: "rail",
-        message: this.formatIncidentMessage(incident, "rail"),
+        message: this._formatIncidentMessage(incident, "rail"),
       });
     });
 
-    // Process bus incidents
     incidents.bus.forEach((incident) => {
       formattedIncidents.push({
         type: "bus",
-        message: this.formatIncidentMessage(incident, "bus"),
+        message: this._formatIncidentMessage(incident, "bus"),
       });
     });
 
     return formattedIncidents;
+  }
+
+  private _validateConfig(): void {
+    const requiredConfigs = [
+      "primaryApiKey",
+      "railIncidentsUrl",
+      "busIncidentsUrl",
+    ] as const;
+
+    const missingConfigs = requiredConfigs.filter(
+      (config) => !WMATA_API_CONFIG[config]
+    );
+
+    if (missingConfigs.length > 0) {
+      throw new Error(
+        `Missing required configurations: ${missingConfigs.join(", ")}`
+      );
+    }
   }
 
   private async _fetchIncidents<T, K extends keyof T>(
@@ -151,6 +146,7 @@ class IncidentCheck {
     return incidents.filter((incident) => {
       try {
         const incidentTime = parseISO(incident.DateUpdated);
+        console.log("Parsed incident time: ", incidentTime);
         return isAfter(incidentTime, cutoffTime);
       } catch (error) {
         console.warn(
@@ -161,22 +157,29 @@ class IncidentCheck {
     });
   }
 
-  private _validateConfig(): void {
-    const requiredConfigs = [
-      "primaryApiKey",
-      "railIncidentsUrl",
-      "busIncidentsUrl",
-    ] as const;
+  private _formatIncidentMessage(incident: any, type: "rail" | "bus"): string {
+    let message = "";
 
-    const missingConfigs = requiredConfigs.filter(
-      (config) => !WMATA_API_CONFIG[config]
-    );
-
-    if (missingConfigs.length > 0) {
-      throw new Error(
-        `Missing required configurations: ${missingConfigs.join(", ")}`
-      );
+    switch (type) {
+      case "rail":
+        message = `🚇 Rail Alert: ${incident.Description}${
+          incident.LinesAffected
+            ? `\nLines affected: ${incident.LinesAffected}`
+            : ""
+        }`;
+        break;
+      case "bus":
+        message = `🚌 Bus Alert: ${incident.Description}${
+          incident.RoutesAffected?.length
+            ? `\nRoutes affected: ${incident.RoutesAffected.join(", ")}`
+            : ""
+        }`;
+        break;
     }
+
+    return message.length <= IncidentCheck.MAX_MESSAGE_LENGTH
+      ? message
+      : `${message.slice(0, IncidentCheck.MAX_MESSAGE_LENGTH - 3)}...`;
   }
 }
 
