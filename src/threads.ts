@@ -21,7 +21,7 @@ interface PublishResponse {
 class ThreadsPublisher {
   private readonly client: AxiosInstance;
   private readonly config: Required<ThreadsConfig>;
-  private static readonly DEFAULT_TIMEOUT = 5000;
+  private static readonly DEFAULT_TIMEOUT = 15000;
   private static readonly DEFAULT_BASE_URL = "https://graph.threads.net/v1.0";
 
   constructor(config: ThreadsConfig) {
