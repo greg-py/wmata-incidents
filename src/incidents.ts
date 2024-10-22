@@ -4,6 +4,7 @@ import { RailIncidentsResponse } from "./models/RailIncidentsResponse";
 import { BusIncidentsResponse } from "./models/BusIncidentsResponse";
 import { ElevatorIncidentsResponse } from "./models/ElevatorIncidentsResponse";
 import { WMATA_API_CONFIG } from "./config/api";
+import { toZonedTime } from "date-fns-tz";
 
 type Incident = {
   DateUpdated: string;
@@ -65,10 +66,9 @@ class IncidentCheck {
   }
 
   getNewIncidents(): IncidentTypes {
-    const cutoffTime = subMinutes(
-      new Date(),
-      IncidentCheck.CHECK_INTERVAL_MINUTES
-    );
+    const now = new Date();
+    const estNow = toZonedTime(now, "America/New_York");
+    const cutoffTime = subMinutes(estNow, IncidentCheck.CHECK_INTERVAL_MINUTES);
 
     return {
       rail: this._filterIncidents(this.incidents.rail, cutoffTime),

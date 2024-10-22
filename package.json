@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "tsc && node dist/index.js",
+    "dev": "node --env-file .env dist/index.js",
     "build": "npx tsc"
   },
   "keywords": [],
