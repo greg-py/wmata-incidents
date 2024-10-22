@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { THREADS_API_CONFIG } from "./config/api";
 
 interface ThreadsConfig {
   userId: string;
@@ -48,17 +49,16 @@ class ThreadsPublisher {
     }
   }
 
-  static createFromEnv(): ThreadsPublisher {
-    const userId = process.env.THREADS_USER_ID;
-    const accessToken = process.env.THREADS_ACCESS_TOKEN;
+  static createFromConfig(): ThreadsPublisher {
+    const { userId, accessToken, baseUrl, timeout } = THREADS_API_CONFIG;
 
     if (!userId || !accessToken) {
       throw new Error(
-        "Missing required environment variables: THREADS_USER_ID and/or THREADS_ACCESS_TOKEN"
+        "Missing required configuration: THREADS_USER_ID and/or THREADS_ACCESS_TOKEN"
       );
     }
 
-    return new ThreadsPublisher({ userId, accessToken });
+    return new ThreadsPublisher({ userId, accessToken, baseUrl, timeout });
   }
 
   private _validateConfig(config: ThreadsConfig): void {

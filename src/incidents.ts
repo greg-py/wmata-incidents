@@ -1,5 +1,5 @@
 import axios from "axios";
-import { isAfter, parseISO, subMinutes } from "date-fns";
+import { format, isAfter, parseISO, subMinutes } from "date-fns";
 import { RailIncidentsResponse } from "./models/RailIncidentsResponse";
 import { BusIncidentsResponse } from "./models/BusIncidentsResponse";
 import { ElevatorIncidentsResponse } from "./models/ElevatorIncidentsResponse";
@@ -17,10 +17,15 @@ type IncidentTypes = {
   elevator: ElevatorIncidentsResponse["ElevatorIncidents"];
 };
 
+interface FormattedIncident {
+  type: "rail" | "bus" | "elevator";
+  message: string;
+}
+
 class IncidentCheck {
   private incidents: IncidentTypes;
   private static readonly CHECK_INTERVAL_MINUTES = 5;
-  private static readonly MAX_SUMMARY_LENGTH = 500;
+  private static readonly MAX_MESSAGE_LENGTH = 500;
 
   constructor() {
     this._validateConfig();
@@ -72,21 +77,77 @@ class IncidentCheck {
     };
   }
 
-  buildIncidentSummary(incidents: IncidentTypes): string | null {
-    const descriptions = [
-      ...incidents.rail.map((incident) => incident.Description),
-      ...incidents.bus.map((incident) => incident.Description),
-      ...incidents.elevator.map((incident) => incident.SymptomDescription),
-    ].filter((desc): desc is string => !!desc);
+  formatIncidentMessage(
+    incident: any,
+    type: "rail" | "bus" | "elevator"
+  ): string {
+    let message = "";
 
-    if (descriptions.length === 0) {
-      return null;
+    switch (type) {
+      case "rail":
+        message = `🚇 Rail Alert: ${incident.Description}${
+          incident.LinesAffected
+            ? `\nLines affected: ${incident.LinesAffected}`
+            : ""
+        }`;
+        break;
+      case "bus":
+        message = `🚌 Bus Alert: ${incident.Description}${
+          incident.RoutesAffected?.length
+            ? `\nRoutes affected: ${incident.RoutesAffected.join(", ")}`
+            : ""
+        }`;
+        break;
+      case "elevator":
+        let formattedReturnToService = "";
+        if (incident.EstimatedReturnToService) {
+          const returnDate = parseISO(incident.EstimatedReturnToService);
+          formattedReturnToService = format(returnDate, "PPpp");
+        }
+
+        message = `🛗 ${incident.UnitType} Alert at ${incident.StationName}: ${
+          incident.SymptomDescription
+        }${
+          formattedReturnToService
+            ? `\nEstimated return to service: ${formattedReturnToService}`
+            : ""
+        }`;
+        break;
     }
 
-    const summary = descriptions.join(" | ");
-    return summary.length <= IncidentCheck.MAX_SUMMARY_LENGTH
-      ? summary
-      : `${summary.slice(0, IncidentCheck.MAX_SUMMARY_LENGTH - 3)}...`;
+    return message.length <= IncidentCheck.MAX_MESSAGE_LENGTH
+      ? message
+      : `${message.slice(0, IncidentCheck.MAX_MESSAGE_LENGTH - 3)}...`;
+  }
+
+  getFormattedIncidents(incidents: IncidentTypes): FormattedIncident[] {
+    const formattedIncidents: FormattedIncident[] = [];
+
+    // Process rail incidents
+    incidents.rail.forEach((incident) => {
+      formattedIncidents.push({
+        type: "rail",
+        message: this.formatIncidentMessage(incident, "rail"),
+      });
+    });
+
+    // Process bus incidents
+    incidents.bus.forEach((incident) => {
+      formattedIncidents.push({
+        type: "bus",
+        message: this.formatIncidentMessage(incident, "bus"),
+      });
+    });
+
+    // Process elevator incidents
+    incidents.elevator.forEach((incident) => {
+      formattedIncidents.push({
+        type: "elevator",
+        message: this.formatIncidentMessage(incident, "elevator"),
+      });
+    });
+
+    return formattedIncidents;
   }
 
   private async _fetchIncidents<T, K extends keyof T>(

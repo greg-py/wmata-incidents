@@ -7,17 +7,39 @@ const main = async () => {
 
     // Initialize services
     const incidentCheck = new IncidentCheck();
-    const threadsPublisher = ThreadsPublisher.createFromEnv();
+    const threadsPublisher = ThreadsPublisher.createFromConfig();
 
     // Fetch and process incidents
     await incidentCheck.fetchAllIncidents();
     const newIncidents = incidentCheck.getNewIncidents();
-    const incidentSummary = incidentCheck.buildIncidentSummary(newIncidents);
+    const formattedIncidents =
+      incidentCheck.getFormattedIncidents(newIncidents);
 
-    if (incidentSummary) {
-      console.log("Publishing new incidents to Threads");
-      const postId = await threadsPublisher.publishPost(incidentSummary);
-      console.log(`Successfully published to Threads with ID: ${postId}`);
+    if (formattedIncidents.length > 0) {
+      console.log(
+        `Found ${formattedIncidents.length} new incidents to publish`
+      );
+
+      // Process each incident sequentially to avoid rate limiting
+      for (const incident of formattedIncidents) {
+        try {
+          console.log(`Publishing ${incident.type} incident to Threads`);
+          const postId = await threadsPublisher.publishPost(incident.message);
+          console.log(
+            `Successfully published ${incident.type} incident with ID: ${postId}`
+          );
+
+          // Add a small delay between posts to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(
+            `Failed to publish ${incident.type} incident:`,
+            error instanceof Error ? error.message : String(error)
+          );
+          // Continue with next incident even if one fails
+          continue;
+        }
+      }
     } else {
       console.log("No new incidents found");
     }
@@ -32,6 +54,7 @@ const main = async () => {
   }
 };
 
+// Error handling
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled promise rejection:", error);
   process.exit(1);
