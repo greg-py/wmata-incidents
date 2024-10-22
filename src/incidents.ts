@@ -1,8 +1,7 @@
 import axios from "axios";
-import { format, isAfter, parseISO, subMinutes } from "date-fns";
+import { isAfter, parseISO, subMinutes } from "date-fns";
 import { RailIncidentsResponse } from "./models/RailIncidentsResponse";
 import { BusIncidentsResponse } from "./models/BusIncidentsResponse";
-import { ElevatorIncidentsResponse } from "./models/ElevatorIncidentsResponse";
 import { WMATA_API_CONFIG } from "./config/api";
 import { toZonedTime } from "date-fns-tz";
 
@@ -15,11 +14,10 @@ type Incident = {
 type IncidentTypes = {
   rail: RailIncidentsResponse["Incidents"];
   bus: BusIncidentsResponse["BusIncidents"];
-  elevator: ElevatorIncidentsResponse["ElevatorIncidents"];
 };
 
 interface FormattedIncident {
-  type: "rail" | "bus" | "elevator";
+  type: "rail" | "bus";
   message: string;
 }
 
@@ -33,13 +31,12 @@ class IncidentCheck {
     this.incidents = {
       rail: [],
       bus: [],
-      elevator: [],
     };
   }
 
   async fetchAllIncidents(): Promise<IncidentTypes> {
     try {
-      const [rail, bus, elevator] = await Promise.all([
+      const [rail, bus] = await Promise.all([
         this._fetchIncidents<RailIncidentsResponse, "Incidents">(
           WMATA_API_CONFIG.railIncidentsUrl,
           "Incidents"
@@ -48,13 +45,9 @@ class IncidentCheck {
           WMATA_API_CONFIG.busIncidentsUrl,
           "BusIncidents"
         ),
-        this._fetchIncidents<ElevatorIncidentsResponse, "ElevatorIncidents">(
-          WMATA_API_CONFIG.elevatorIncidentsUrl,
-          "ElevatorIncidents"
-        ),
       ]);
 
-      this.incidents = { rail, bus, elevator };
+      this.incidents = { rail, bus };
       return this.incidents;
     } catch (error) {
       throw new Error(
@@ -73,14 +66,10 @@ class IncidentCheck {
     return {
       rail: this._filterIncidents(this.incidents.rail, cutoffTime),
       bus: this._filterIncidents(this.incidents.bus, cutoffTime),
-      elevator: this._filterIncidents(this.incidents.elevator, cutoffTime),
     };
   }
 
-  formatIncidentMessage(
-    incident: any,
-    type: "rail" | "bus" | "elevator"
-  ): string {
+  formatIncidentMessage(incident: any, type: "rail" | "bus"): string {
     let message = "";
 
     switch (type) {
@@ -95,21 +84,6 @@ class IncidentCheck {
         message = `🚌 Bus Alert: ${incident.Description}${
           incident.RoutesAffected?.length
             ? `\nRoutes affected: ${incident.RoutesAffected.join(", ")}`
-            : ""
-        }`;
-        break;
-      case "elevator":
-        let formattedReturnToService = "";
-        if (incident.EstimatedReturnToService) {
-          const returnDate = parseISO(incident.EstimatedReturnToService);
-          formattedReturnToService = format(returnDate, "PPpp");
-        }
-
-        message = `🛗 ${incident.UnitType} Alert at ${incident.StationName}: ${
-          incident.SymptomDescription
-        }${
-          formattedReturnToService
-            ? `\nEstimated return to service: ${formattedReturnToService}`
             : ""
         }`;
         break;
@@ -136,14 +110,6 @@ class IncidentCheck {
       formattedIncidents.push({
         type: "bus",
         message: this.formatIncidentMessage(incident, "bus"),
-      });
-    });
-
-    // Process elevator incidents
-    incidents.elevator.forEach((incident) => {
-      formattedIncidents.push({
-        type: "elevator",
-        message: this.formatIncidentMessage(incident, "elevator"),
       });
     });
 
@@ -200,7 +166,6 @@ class IncidentCheck {
       "primaryApiKey",
       "railIncidentsUrl",
       "busIncidentsUrl",
-      "elevatorIncidentsUrl",
     ] as const;
 
     const missingConfigs = requiredConfigs.filter(

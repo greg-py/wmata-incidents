@@ -11,5 +11,5 @@ export const THREADS_API_CONFIG = {
   baseUrl: process.env.THREADS_API_BASE_URL || "https://graph.threads.net/v1.0",
   timeout: process.env.THREADS_API_TIMEOUT
     ? Number(process.env.THREADS_API_TIMEOUT)
-    : 5000,
+    : 15000,
 };
