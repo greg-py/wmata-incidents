@@ -1,5 +1,11 @@
 import axios from "axios";
-import { isAfter, parseISO, subMinutes } from "date-fns";
+import {
+  isAfter,
+  parseISO,
+  setMilliseconds,
+  setSeconds,
+  subMinutes,
+} from "date-fns";
 import { RailIncidentsResponse } from "./models/RailIncidentsResponse";
 import { BusIncidentsResponse } from "./models/BusIncidentsResponse";
 import { WMATA_API_CONFIG } from "./config/api";
@@ -63,7 +69,14 @@ class IncidentCheck {
   getNewIncidents(): IncidentTypes {
     const now = new Date();
     const estNow = toZonedTime(now, "America/New_York");
-    const cutoffTime = subMinutes(estNow, IncidentCheck.CHECK_INTERVAL_MINUTES);
+
+    // Set seconds and milliseconds to zero
+    const roundedEstNow = setSeconds(setMilliseconds(estNow, 0), 0);
+    const cutoffTime = subMinutes(
+      roundedEstNow,
+      IncidentCheck.CHECK_INTERVAL_MINUTES
+    );
+
     console.log("Calculated cutoff time: ", cutoffTime);
 
     return {
