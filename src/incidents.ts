@@ -7,7 +7,6 @@ import {
   subMinutes,
 } from "date-fns";
 import { RailIncidentsResponse } from "./models/RailIncidentsResponse";
-import { BusIncidentsResponse } from "./models/BusIncidentsResponse";
 import { WMATA_API_CONFIG } from "./config/api";
 import { toZonedTime } from "date-fns-tz";
 
@@ -19,7 +18,6 @@ type Incident = {
 
 type IncidentTypes = {
   rail: RailIncidentsResponse["Incidents"];
-  bus: BusIncidentsResponse["BusIncidents"];
 };
 
 interface FormattedIncident {
@@ -36,25 +34,20 @@ class IncidentCheck {
     this._validateConfig();
     this.incidents = {
       rail: [],
-      bus: [],
     };
   }
 
   // Fetches all rail/bus current incidents from WMATA API
   async fetchAllIncidents(): Promise<IncidentTypes> {
     try {
-      const [rail, bus] = await Promise.all([
+      const [rail] = await Promise.all([
         this._fetchIncidents<RailIncidentsResponse, "Incidents">(
           WMATA_API_CONFIG.railIncidentsUrl,
           "Incidents"
         ),
-        this._fetchIncidents<BusIncidentsResponse, "BusIncidents">(
-          WMATA_API_CONFIG.busIncidentsUrl,
-          "BusIncidents"
-        ),
       ]);
 
-      this.incidents = { rail, bus };
+      this.incidents = { rail };
       return this.incidents;
     } catch (error) {
       throw new Error(
@@ -81,7 +74,6 @@ class IncidentCheck {
 
     return {
       rail: this._filterIncidents(this.incidents.rail, cutoffTime),
-      bus: this._filterIncidents(this.incidents.bus, cutoffTime),
     };
   }
 
@@ -93,13 +85,6 @@ class IncidentCheck {
       formattedIncidents.push({
         type: "rail",
         message: this._formatIncidentMessage(incident, "rail"),
-      });
-    });
-
-    incidents.bus.forEach((incident) => {
-      formattedIncidents.push({
-        type: "bus",
-        message: this._formatIncidentMessage(incident, "bus"),
       });
     });
 
